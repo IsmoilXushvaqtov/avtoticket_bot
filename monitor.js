@@ -6,87 +6,90 @@ const http = require('http');
 const token = '8823851415:AAGXmDtPcWtBT0BLzrTMhVDwwT0eSuloQNM';
 const chatId = '6920365271';
 
-// 2. API manzili va kerakli sanalar
-const apiUrl = 'https://wapi.avtoticket.uz/api/api-trips?from=1726&to=1722210'; 
-const targetDates = ["2026-05-25", "2026-05-26", "2026-05-27"];
-
 const bot = new TelegramBot(token, { polling: false });
 let lastNotificationTime = 0;
 
-// 3. Asosiy tekshirish funksiyasi
 async function checkTickets() {
     try {
-        const response = await axios.get(apiUrl, {
+        // 2. 1 HAFTALIK TEKSHIRUV SOZLAMALARI
+        const payloadData = {
+            date: "2026-05-23", // Shu sanadan boshlab tekshirishni boshlaydi
+            days: 7,            // 23-maydan boshlab 7 kunni (23, 24, 25, 26, 27, 28, 29-may) birdaniga tekshiradi
+            from: 1726,         // Toshkent shahri ID si
+            to: 1722210         // Surxondaryo viloyati ID si
+        };
+
+        const response = await axios.post('https://wapi.avtoticket.uz/api/api-trips', payloadData, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Accept': 'application/json, text/plain, */*'
+                'Accept': 'application/json, text/plain, */*',
+                'Content-Type': 'application/json'
             },
             timeout: 15000
         });
-        
+
         if (!response.data || !response.data.data) return;
+
         const days = response.data.data;
         let foundTicketsMessage = "";
 
+        // 7 kunlik barcha ma'lumotlarni aylanib chiqish
         for (const day of days) {
-            if (targetDates.includes(day.name)) {
-                // Yangi reys qo'shilganini tekshirish
-                if (day.name === "2026-05-26" && day.count > 2) {
-                    foundTicketsMessage += `\n➕ **2026-05-26** sanasiga yangi avtobus qo'shildi!`;
-                } else if ((day.name === "2026-05-25" || day.name === "2026-05-27") && day.count > 0) {
-                    foundTicketsMessage += `\n➕ **${day.name}** sanasiga reys ochildi!`;
-                }
+            if (day.trips && day.trips.length > 0) {
+                for (const trip of day.trips) {
+                    const routeName = trip.route_name_uz.toLowerCase();
+                    
+                    // Faqat Uzun va Denovga boradigan avtobuslarni ajratib olish
+                    if (routeName.includes("uzun") || routeName.includes("denov")) {
+                        const availableSeats = trip.seats - trip.sold_seats;
 
-                // Bo'sh joylarni tekshirish
-                if (day.trips && day.trips.length > 0) {
-                    for (const trip of day.trips) {
-                        const routeName = trip.route_name_uz.toLowerCase();
-                        if (routeName.includes("uzun") || routeName.includes("denov")) {
-                            const availableSeats = trip.seats - trip.sold_seats;
-
-                            if (availableSeats > 0) {
-                                const departureTime = trip.departure_at.split(' ')[1];
-                                foundTicketsMessage += `\n🚌 **${day.name}** | ${trip.route_name_uz}\n⏰ Soat: ${departureTime} -> **${availableSeats} ta joy bor!**\n`;
-                            }
+                        // Agar loaqal 1 ta joy bo'lsa ham xabar yozish
+                        if (availableSeats > 0) {
+                            const departureTime = trip.departure_at.split(' ')[1];
+                            foundTicketsMessage += `\n🚌 **${day.name}** | ${trip.route_name_uz}\n⏰ Soat: ${departureTime} -> **${availableSeats} ta bo'sh joy bor!**\n`;
                         }
                     }
                 }
             }
         }
 
-        // Bilet topilsa, xabar yuborish
+        // Bilet topilsa, darhol Telegramga xabar berish
         if (foundTicketsMessage !== "") {
             const now = Date.now();
             if (now - lastNotificationTime > 3 * 60 * 1000) { 
-                const finalMsg = `🎉 **DIQQAT! SOTUVDA BILET BOR!**\n${foundTicketsMessage}\n🏃‍♂️ Kirib sotib oling: https://avtoticket.uz/`;
+                const finalMsg = `🎉 **DIQQAT! BILET SOTUVGA CHIQDI!**\n${foundTicketsMessage}\n🏃‍♂️ Zudlik bilan kirib sotib oling: https://avtoticket.uz/`;
                 await bot.sendMessage(chatId, finalMsg, { parse_mode: 'Markdown' });
                 lastNotificationTime = now;
             }
         }
+
     } catch (error) {
         console.log(`Xatolik yuz berdi: ${error.message}`);
     }
 }
 
+// Bot yonganda eslatma
+bot.sendMessage(chatId, "✅ **Avtoticket Monitoring (1 Haftalik rejim) muvaffaqiyatli ishga tushdi!**\n\nEndi bot 23-maydan 29-maygacha bo'lgan barcha Uzun va Denov reyslarini har daqiqada tekshirib boradi.", { parse_mode: 'Markdown' });
+
 // Har 1 daqiqada tekshirish
 setInterval(checkTickets, 60 * 1000);
 checkTickets();
 
-// 4. Har 1 soatda Bot ishlashi haqida hisobot
+// Har 1 soatda Bot ishlab turgani haqida hisobot
 setInterval(async () => {
     try {
         const time = new Date().toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent' });
-        const statusMsg = `🤖 **Bot Holati Eslatmasi:**\n🟢 Server 24/7 rejimda faol.\n🔄 Avtoticket sayti har daqiqada tekshirilmoqda.\n⏰ Oxirgi tekshiruv vaqti: ${time}\n\nXavotir olmang, bot ishlayapti!`;
+        const statusMsg = `🤖 **Bot Holati Eslatmasi:**\n🟢 Server 24/7 rejimda faol.\n🔄 1 haftalik biletlar har daqiqada tekshirilmoqda.\n⏰ Oxirgi tekshiruv vaqti: ${time}`;
         await bot.sendMessage(chatId, statusMsg, { parse_mode: 'Markdown' });
     } catch (err) {
-        console.error("Status yuborishda xatolik:", err.message);
+        console.error("Status xatosi:", err.message);
     }
 }, 60 * 60 * 1000);
 
-// 5. Render serveri o'chib qolmasligi uchun yordamchi kod
+// Render serveri uchun
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot ishlamoqda...\n');
+    res.end('Bot 1 haftalik rejimda ishlamoqda...\n');
 });
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
