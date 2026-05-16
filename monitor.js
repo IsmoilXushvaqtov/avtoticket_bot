@@ -2,7 +2,7 @@ const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 
-// Bot Token va Chat ID ni almashtiring
+// Sizning ma'lumotlaringiz to'g'ridan-to'g'ri kodga joylandi:
 const token = '8823851415:AAGXmDtPcWtBT0BLzrTMhVDwwT0eSuloQNM';
 const chatId = '6920365271';
 
@@ -20,22 +20,24 @@ const getTodayDate = () => {
 async function checkTickets() {
     try {
         const payloadData = {
-            date: getTodayDate(), // Bugungi sanadan boshlab
-            days: 7,              // Kelayotgan 1 haftani tekshiradi
+            date: getTodayDate(),
+            days: 7,
             from: 1726,
-            to: 990005008         // Kolomna (Moskva) - TEST
+            to: 990005008 
         };
 
         const response = await axios.post('https://wapi.avtoticket.uz/api/api-trips', payloadData, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Content-Type': 'application/json',
+                'Origin': 'https://avtoticket.uz',
+                'Referer': 'https://avtoticket.uz/'
             },
             timeout: 10000
         });
 
-        const days = response.data.data;
+        const days = response.data?.data;
         let foundTicketsMessage = "";
 
         if (days) {
@@ -51,7 +53,6 @@ async function checkTickets() {
             }
         }
 
-        // Natijaga qarab har daqiqada xabar yuborish
         if (foundTicketsMessage !== "") {
             await bot.sendMessage(chatId, `✅ **BILET TOPILDI!**${foundTicketsMessage}`, { parse_mode: 'Markdown' });
         } else {
@@ -59,17 +60,19 @@ async function checkTickets() {
         }
 
     } catch (error) {
-        console.log(`Xatolik: ${error.message}`);
+        console.error("Xatolik xulosasi:", error.message);
+        // Agar yana 405 yoki boshqa xatolik bo'lsa, Telegramga qizil belgi va xatolik sababini yuboramiz
+        await bot.sendMessage(chatId, `❌ Sayt bilan ulanishda xatolik: ${error.message}`);
     }
 }
 
-// Skriptni har 60 soniyada ishga tushirish
 setInterval(checkTickets, 60 * 1000);
 checkTickets();
 
-// Render uchun server
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Bot ishlamoqda\n');
 });
-server.listen(process.env.PORT || 3000);
+server.listen(process.env.PORT || 3000, () => {
+    console.log("Server portda ishga tushdi!");
+});
