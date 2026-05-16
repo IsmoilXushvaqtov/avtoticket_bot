@@ -2,28 +2,20 @@ const axios = require('axios');
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 
-// Sizning ma'lumotlaringiz to'g'ridan-to'g'ri kodga joylandi:
+// Sizning Telegram Bot Token va Chat ID (hech narsani o'zgartirmang)
 const token = '8823851415:AAGXmDtPcWtBT0BLzrTMhVDwwT0eSuloQNM';
 const chatId = '6920365271';
 
 const bot = new TelegramBot(token, { polling: false });
 
-// Bugungi sanani olish (Y-M-D formatida)
-const getTodayDate = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-};
-
 async function checkTickets() {
     try {
+        // Aniq siz xohlagan sanalar va yo'nalishlar (24-maydan boshlab 4 kun)
         const payloadData = {
-            date: getTodayDate(),
-            days: 7,
-            from: 1726,
-            to: 990005008 
+            date: "2026-05-24", // 24-maydan boshlaymiz
+            days: 4,            // 24, 25, 26, 27-may kunlarini olamiz
+            from: 1726,         // Toshkent shahri
+            to: 1722210         // Surxondaryo viloyati
         };
 
         const response = await axios.post('https://wapi.avtoticket.uz/api/api-trips', payloadData, {
@@ -40,38 +32,53 @@ async function checkTickets() {
         const days = response.data?.data;
         let foundTicketsMessage = "";
 
+        // Ma'lumotlarni saralash (Faqat Uzun va Denovni qidiramiz)
         if (days) {
             for (const day of days) {
                 if (day.trips && day.trips.length > 0) {
                     for (const trip of day.trips) {
-                        const availableSeats = trip.seats - trip.sold_seats;
-                        if (availableSeats > 0) {
-                            foundTicketsMessage += `\n🚌 ${day.name} | ${trip.route_name_uz} -> **${availableSeats} ta joy bor!**`;
+                        const routeName = trip.route_name_uz.toLowerCase();
+                        
+                        // Kichik harflar bilan tekshiramiz, qanday yozilgan bo'lsa ham topadi
+                        if (routeName.includes("uzun") || routeName.includes("denov")) {
+                            const availableSeats = trip.seats - trip.sold_seats;
+                            
+                            // Agar 1 ta bo'lsa ham joy bo'lsa, xabarga qo'shamiz
+                            if (availableSeats > 0) {
+                                const departureTime = trip.departure_at.split(' ')[1].substring(0, 5); // Soatini chiroyli qilib olamiz (18:00)
+                                foundTicketsMessage += `\n🚌 **${day.name}** | ${trip.route_name_uz} \n⏰ Soat: ${departureTime} -> **${availableSeats} ta joy bor!**\n`;
+                            }
                         }
                     }
                 }
             }
         }
 
+        // Joriy vaqtni olish
+        const timeNow = new Date().toLocaleTimeString('uz-UZ', { timeZone: 'Asia/Tashkent' });
+
+        // Natijaga qarab har daqiqada xabar yuborish
         if (foundTicketsMessage !== "") {
-            await bot.sendMessage(chatId, `✅ **BILET TOPILDI!**${foundTicketsMessage}`, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, `✅ **BILET TOPILDI! (${timeNow})**\n${foundTicketsMessage}\n🏃‍♂️ Zudlik bilan saytga kiring: https://avtoticket.uz/`, { parse_mode: 'Markdown' });
         } else {
-            await bot.sendMessage(chatId, `❌ Hozircha kelayotgan 1 hafta ichida bilet yo'q.`);
+            await bot.sendMessage(chatId, `❌ [${timeNow}] 24, 25, 26, 27-may kunlari uchun Denov/Uzunga bilet yo'q.`);
         }
 
     } catch (error) {
-        console.error("Xatolik xulosasi:", error.message);
-        // Agar yana 405 yoki boshqa xatolik bo'lsa, Telegramga qizil belgi va xatolik sababini yuboramiz
-        await bot.sendMessage(chatId, `❌ Sayt bilan ulanishda xatolik: ${error.message}`);
+        console.error("Xatolik:", error.message);
+        // Sayt qotib qolsa ham qizil xabar beradi
+        await bot.sendMessage(chatId, `⚠️ Sayt bilan ulanishda xatolik: ${error.message}`);
     }
 }
 
+// Skriptni har 60 soniyada ishga tushirish (Siz xohlagandek har daqiqada)
 setInterval(checkTickets, 60 * 1000);
 checkTickets();
 
+// Render bulutli serveri uchun majburiy kod
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot ishlamoqda\n');
+    res.end('Avtoticket Denov Monitoring\n');
 });
 server.listen(process.env.PORT || 3000, () => {
     console.log("Server portda ishga tushdi!");
