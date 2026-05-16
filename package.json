@@ -1,13 +1,13 @@
 {
-"name": "avtoticket-monitor",
-"version": "1.0.0",
-"description": "Avtoticket 24/7 ticket monitoring bot",
-"main": "monitor.js",
-"scripts": {
-"start": "node monitor.js"
-},
-"dependencies": {
-"axios": "^1.6.0",
-"node-telegram-bot-api": "^0.64.0"
-}
+  "name": "avtoticket-monitor",
+  "version": "1.0.0",
+  "description": "Avtoticket 24/7 ticket monitoring bot",
+  "main": "monitor.js",
+  "scripts": {
+    "start": "node monitor.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "node-telegram-bot-api": "^0.64.0"
+  }
 }
