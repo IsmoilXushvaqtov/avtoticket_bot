@@ -13,7 +13,7 @@ async function checkTickets() {
         // Aniq siz xohlagan sanalar va yo'nalishlar (24-maydan boshlab 4 kun)
         const payloadData = {
             date: "2026-05-24", // 24-maydan boshlaymiz
-            days: 7,            // 24, 25, 26, 27-may kunlarini olamiz
+            days: 4,            // 24, 25, 26, 27-may kunlarini olamiz
             from: 1726,         // Toshkent shahri
             to: 1722210         // Surxondaryo viloyati
         };
